@@ -1,0 +1,53 @@
+# Only the database runs in Docker; Python runs in your local virtualenv.
+# This keeps the edit-run loop fast and debuggable for development.
+services:
+  postgres:
+    image: postgres:16
+    container_name: shelfwise-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shelfwise}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_locally}
+      POSTGRES_DB: ${POSTGRES_DB:-shelfwise}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Docker's default /dev/shm is 64MB. Postgres parallel queries use shared
+    # memory and fail with "could not resize shared memory segment" on big
+    # sorts/aggregations unless this is raised.
+    shm_size: "1gb"
+    # Settings for a laptop analytics workload (not an OLTP server):
+    #  - bigger work_mem / maintenance_work_mem -> sorts and index builds stay in RAM
+    #  - bigger max_wal_size -> fewer checkpoints during bulk loads
+    #  - synchronous_commit=off -> faster bulk inserts; on a crash you could lose the
+    #    last few transactions, which is fine because the pipeline is re-runnable.
+    #    Never do this on a database that holds data you can't rebuild.
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=1GB"
+      - "-c"
+      - "work_mem=128MB"
+      - "-c"
+      - "maintenance_work_mem=1GB"
+      - "-c"
+      - "max_wal_size=8GB"
+      - "-c"
+      - "checkpoint_timeout=15min"
+      - "-c"
+      - "synchronous_commit=off"
+      - "-c"
+      - "max_parallel_workers_per_gather=4"
+      - "-c"
+      - "effective_cache_size=4GB"
+      - "-c"
+      - "random_page_cost=1.1"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shelfwise} -d ${POSTGRES_DB:-shelfwise}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pgdata:

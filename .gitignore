@@ -1,0 +1,43 @@
+# --- Data: never commit the M5 files or anything derived from them ---
+data/raw/*
+data/cache/*
+!data/raw/.gitkeep
+!data/cache/.gitkeep
+*.csv.zip
+*.parquet
+*.npz
+
+# Trained models (re-creatable with `make run`)
+models/*
+!models/.gitkeep
+
+# Generated outputs. Keep the folder structure; commit selected results
+# deliberately (e.g. `git add -f reports/results/results.md`) once you have real runs.
+reports/results/*
+reports/figures/*
+reports/data_quality/*
+reports/benchmarks/*
+!reports/**/.gitkeep
+reports/run_timings.csv
+
+logs/*
+!logs/.gitkeep
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
