@@ -143,9 +143,32 @@ built-in TreeSHAP as a fallback. Values are in log space because of the tweedie 
 **Newsvendor rule:** with underage cost c_u (lost margin per unit of unmet demand) and
 overage cost c_o (cost per unsold unit), the expected-cost-minimising order is the demand
 quantile at the critical ratio CR = c_u / (c_u + c_o). Quantiles between the trained
-levels are linearly interpolated; outside P10–P90 they are clamped. Orders are rounded
-**up** to whole units, which is the discrete newsvendor solution. A unit test checks the
-rule against brute-force cost minimisation on simulated demand.
+levels are linearly interpolated; outside P10–P90 they are clamped. The quantile is then
+rounded to the **nearest** whole unit (`decision.rounding: nearest`). A unit test checks
+the newsvendor rule against brute-force cost minimisation on simulated demand.
+
+> **Disclosed post-hoc change.** The first backtest rounded the quantile **up**,
+> following the textbook rule for discrete demand (order the smallest integer Q with
+> F(Q) ≥ CR). That rule assumes you know the true discrete distribution. LightGBM
+> instead gives a continuous estimate of a quantile that is really an integer. On the
+> CA_1 run, 36.5% of item-days had an estimated P75 between 0 and 1 (e.g. 0.3), so
+> rounding up ordered one unit almost every day for slow movers.
+>
+> The effect on that run (3 folds, critical ratio 0.75):
+>
+> | | Round up (original) | Nearest unit (current) |
+> |---|---|---|
+> | Share of item-days without a stock-out (target 0.75) | 0.917 | 0.876 |
+> | Saving vs. naive ordering | 13.6% | 22.4% |
+> | vs. LightGBM point-forecast orders | 4.7% **more** expensive | 6.0% cheaper |
+> | vs. empirical-quantile newsvendor | 8.7% **more** expensive | 2.7% cheaper |
+>
+> The change was made **after** seeing test-window results, which is a mild form of
+> tuning on the test set. Both quantile-based policies use the same rule, so the
+> comparison between them stays fair. Setting `decision.rounding: up` reproduces the
+> original numbers. Even after the fix, service level (0.876) is above target. This
+> matches the over-wide prediction intervals (87% coverage vs. 80% nominal): the
+> quantiles are not yet well calibrated (see "What I'd do next").
 
 **Cost assumptions (`config.yaml → decision`), all as a fraction of the selling price:**
 

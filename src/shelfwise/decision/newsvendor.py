@@ -22,8 +22,15 @@ produce bad orders if its uncertainty is wrong.
 Practical details
   * We have P10/P50/P90; other levels are linearly interpolated between them (and
     clamped outside [P10, P90] - a documented approximation).
-  * Demand comes in whole units, so the order is rounded UP (the discrete newsvendor
-    solution is the smallest integer Q with F(Q) >= CR).
+  * Demand comes in whole units, so the quantile must become an integer. We round to the
+    NEAREST unit by default. Textbook theory says "round up" (the discrete newsvendor
+    order is the smallest integer Q with F(Q) >= CR) - but that applies to the TRUE
+    discrete distribution. LightGBM gives a continuous *estimate* of what is really an
+    integer quantile; for slow movers the estimated P75 is often 0.2-0.4 where the true
+    P75 is 0. Rounding those up orders 1 unit nearly every day.
+    DISCLOSURE: the first backtest used "up" and over-ordered (92% of item-days without a
+    stock-out vs a 75% target); we switched to "nearest" after seeing that result.
+    `decision.rounding: up` in config.yaml reproduces the original rule.
 """
 
 from __future__ import annotations
@@ -74,10 +81,21 @@ def interpolate_quantile(levels: Sequence[float], values: np.ndarray, target: fl
     return (1 - w) * values[:, j - 1] + w * values[:, j]
 
 
-def order_quantity(levels: Sequence[float], values: np.ndarray, cr: float) -> np.ndarray:
-    """Newsvendor order: interpolated CR-quantile, rounded up to whole units, never negative."""
-    q = interpolate_quantile(levels, values, cr)
-    return np.maximum(np.ceil(q - 1e-9), 0)
+def to_units(q: np.ndarray, rounding: str = "nearest") -> np.ndarray:
+    """Continuous quantile estimate -> whole units, never negative ('nearest' or 'up')."""
+    q = np.asarray(q, dtype=float)
+    if rounding == "nearest":
+        units = np.floor(q + 0.5)          # half-up; np.round would send 0.5 and 2.5 to the even number
+    elif rounding == "up":
+        units = np.ceil(q - 1e-9)
+    else:
+        raise ValueError("rounding must be 'nearest' or 'up'")
+    return np.maximum(units, 0)
+
+
+def order_quantity(levels: Sequence[float], values: np.ndarray, cr: float, rounding: str = "nearest") -> np.ndarray:
+    """Newsvendor order: interpolated CR-quantile converted to whole units (see module notes)."""
+    return to_units(interpolate_quantile(levels, values, cr), rounding)
 
 
 # ----------------------------------------------------------------- cost simulation

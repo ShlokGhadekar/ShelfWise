@@ -20,8 +20,10 @@ settings = get_settings()
 
 
 def _layout(fig: go.Figure, title: str, ytitle: str) -> go.Figure:
-    fig.update_layout(title=title, height=420, margin=dict(l=10, r=10, t=50, b=10), hovermode="x unified",
-                      legend=dict(orientation="h", y=1.02, x=0, yanchor="bottom"), yaxis_title=ytitle,
+    # Title on its own line, legend below the plot, so the two never overlap.
+    fig.update_layout(title=dict(text=title, y=0.97, yanchor="top"), height=440,
+                      margin=dict(l=10, r=10, t=50, b=60), hovermode="x unified",
+                      legend=dict(orientation="h", y=-0.12, x=0, yanchor="top"), yaxis_title=ytitle,
                       template="plotly_white")
     fig.update_xaxes(showgrid=False)
     fig.update_yaxes(gridcolor="#e1e0d9")
@@ -36,6 +38,14 @@ def _stores():
 @st.cache_data(ttl=300)
 def _items(store):
     return queries.items(store)
+
+
+@st.cache_data(ttl=300)
+def _default_item(store):
+    try:
+        return queries.top_item(store)
+    except Exception:
+        return None
 
 
 st.title("ShelfWise - demand forecasts & order recommendations")
@@ -56,8 +66,12 @@ with tab_fc:
     c1, c2, c3 = st.columns([1, 1, 2])
     store = c1.selectbox("Store", store_list)
     items = _items(store)
-    dept = c2.selectbox("Department", sorted(items["dept_id"].unique()))
-    item = c3.selectbox("Item", items[items["dept_id"] == dept]["item_id"])
+    default = _default_item(store)          # start on the store's best seller, not the first item A-Z
+    depts = sorted(items["dept_id"].unique())
+    dept = c2.selectbox("Department", depts, index=depts.index(default[0]) if default and default[0] in depts else 0)
+    item_list = items[items["dept_id"] == dept]["item_id"].tolist()
+    item = c3.selectbox("Item", item_list,
+                        index=item_list.index(default[1]) if default and default[1] in item_list else 0)
     hist_days = st.slider("Days of history", 28, 365, 112, step=7)
 
     series = queries.find_series(item, store)

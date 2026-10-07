@@ -84,6 +84,9 @@ decision:
   gross_margin: 0.30           # unit cost = 70% of price; a lost sale loses 30% of price
   goodwill_frac: 0.00          # extra penalty per lost sale (customer annoyance); 0 = conservative
   overage_frac: 0.10           # cost of each unsold unit per day (holding/markdown/waste)
+  # Quantile -> whole units. 'nearest' (default) or 'up' (the original rule, which
+  # over-ordered slow movers in the first backtest - see docs/methodology.md section 6).
+  rounding: nearest
   mode: newsvendor             # newsvendor (unsold stock written off daily) | carryover (stock carried, pays overage each night)
   sensitivity_critical_ratios: [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9]
 

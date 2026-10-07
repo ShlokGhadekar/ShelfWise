@@ -39,6 +39,20 @@ def items(store_id: str, dept_id: str | None = None) -> pd.DataFrame:
     return _df(sql + " ORDER BY item_id", store=store_id, dept=dept_id)
 
 
+def top_item(store_id: str, days: int = 28) -> tuple[str, str] | None:
+    """(dept_id, item_id) of the store's best seller over the last `days` days - a sensible
+    default for the dashboard (most items sell 0-1 units a day, which makes a dull first chart)."""
+    df = _df("""SELECT sr.dept_id, sr.item_id
+                FROM staging.sales s JOIN staging.series sr USING (series_id)
+                WHERE sr.store_id = :store
+                  AND s.date > (SELECT MAX(date) FROM staging.calendar c
+                                WHERE c.d_num = (SELECT value FROM meta.watermarks
+                                                 WHERE key = 'staging_sales_max_day')) - CAST(:days AS integer)
+                GROUP BY sr.dept_id, sr.item_id
+                ORDER BY SUM(s.sales) DESC NULLS LAST LIMIT 1""", store=store_id, days=days)
+    return None if df.empty else (df.iloc[0]["dept_id"], df.iloc[0]["item_id"])
+
+
 def history(series_id: int, days: int) -> pd.DataFrame:
     last = _df("SELECT MAX(date) AS d FROM staging.sales WHERE series_id = :sid", sid=series_id)["d"].iloc[0]
     if last is None:

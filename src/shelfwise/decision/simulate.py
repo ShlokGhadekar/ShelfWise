@@ -40,6 +40,7 @@ from shelfwise.decision.newsvendor import (
     overage_for_ratio,
     simulate_carryover,
     simulate_newsvendor,
+    to_units,
 )
 from shelfwise.evaluation import plots
 from shelfwise.evaluation.stats_tests import cluster_bootstrap_ratio
@@ -59,15 +60,16 @@ def _empirical_cr_quantile(Y: np.ndarray, origin: int, cr: float, window: int) -
 
 
 def policy_orders(f: pd.DataFrame, Y: np.ndarray, row: np.ndarray, origin: int, cr: float,
-                  quantiles: list[float], emp_window: int) -> dict[str, np.ndarray]:
+                  quantiles: list[float], emp_window: int, rounding: str = "nearest") -> dict[str, np.ndarray]:
+    # Both quantile policies use the same rounding rule so the comparison stays fair.
     Q = f[[f"lgbm_{qname(q)}" for q in quantiles]].to_numpy()
     emp = _empirical_cr_quantile(Y, origin, cr, emp_window)[row]
     return {
         "naive_snaive7": np.round(f["snaive7"].to_numpy()),
         "ma28": np.round(f["ma28"].to_numpy()),
-        "empirical_newsvendor": np.ceil(emp - 1e-9),
+        "empirical_newsvendor": to_units(emp, rounding),
         "lgbm_point": np.round(f["lgbm_point"].to_numpy()),
-        "lgbm_newsvendor": order_quantity(quantiles, Q, cr),
+        "lgbm_newsvendor": order_quantity(quantiles, Q, cr, rounding),
     }
 
 
@@ -132,7 +134,7 @@ def run_decision(settings: Settings) -> dict:
         for k, f in preds.groupby("fold"):
             origin = int(f["origin"].iloc[0])
             row = row_of.loc[f["series_id"].to_numpy()].to_numpy()
-            orders = policy_orders(f, Y, row, origin, cr_value, quantiles, emp_window)
+            orders = policy_orders(f, Y, row, origin, cr_value, quantiles, emp_window, dcfg.rounding)
             for name, res in simulate_fold(f, orders, dcfg.mode, cu, co_value, H).items():
                 rows.append({"fold": k, "policy": name} | summarise(res))
                 per_policy.setdefault(name, []).append(res.assign(fold=k))
@@ -197,7 +199,8 @@ def run_decision(settings: Settings) -> dict:
     md = [
         "# Decision layer - simulated inventory costs (auto-generated)", "",
         f"Mode `{dcfg.mode}`; costs as a fraction of price: underage c_u = {cu:.2f}, overage c_o = {co:.2f} "
-        f"-> critical ratio {cr:.3f}. Costs are assumptions - see the sensitivity table.", "",
+        f"-> critical ratio {cr:.3f}; quantile orders rounded to `{dcfg.rounding}` unit. "
+        "Costs are assumptions - see the sensitivity table.", "",
         summary.to_markdown(index=False, floatfmt=",.4g"), "",
         "## Saving of `lgbm_newsvendor` with 95% cluster-bootstrap CI (by item)", "",
         pd.DataFrame([{"vs policy": k, "saving_pct": v["ratio"], "ci_low_pct": v["ci_low"],

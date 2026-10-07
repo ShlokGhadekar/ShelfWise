@@ -98,6 +98,7 @@ class DecisionCfg(BaseModel):
     goodwill_frac: float = 0.0
     overage_frac: float = 0.10
     mode: str = "newsvendor"
+    rounding: str = "nearest"
     sensitivity_critical_ratios: list[float] = Field(default_factory=lambda: [0.5, 0.75, 0.9])
 
     @property
@@ -215,6 +216,8 @@ class Settings(BaseModel):
         for q in self.lgbm.quantiles:
             if not 0 < q < 1:
                 raise ValueError(f"quantile {q} outside (0, 1)")
+        if self.decision.rounding not in ("nearest", "up"):
+            raise ValueError("decision.rounding must be 'nearest' or 'up'")
         if self.decision.mode not in ("newsvendor", "carryover"):
             raise ValueError("decision.mode must be 'newsvendor' or 'carryover'")
         return self

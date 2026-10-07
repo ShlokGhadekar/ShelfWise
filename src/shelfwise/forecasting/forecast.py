@@ -46,7 +46,7 @@ def run_forecast(settings: Settings) -> pd.DataFrame:
     qs = sorted(cfg.quantiles)
     cr = settings.decision.critical_ratio
     Q = pred[[f"lgbm_{qname(q)}" for q in qs]].to_numpy()
-    order = order_quantity(qs, Q, cr)
+    order = order_quantity(qs, Q, cr, settings.decision.rounding)
 
     row_of = pd.Series(np.arange(len(m["series_id"])), index=m["series_id"])
     rows = row_of.loc[future["series_id"].to_numpy()].to_numpy()

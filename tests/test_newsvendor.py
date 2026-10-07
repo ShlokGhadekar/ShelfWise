@@ -12,6 +12,7 @@ from shelfwise.decision.newsvendor import (
     overage_for_ratio,
     simulate_carryover,
     simulate_newsvendor,
+    to_units,
 )
 
 
@@ -33,9 +34,12 @@ def test_interpolation_exact_between_and_clamped():
     assert interpolate_quantile(levels, v, 0.05)[0] == pytest.approx(2.0)
 
 
-def test_order_is_rounded_up_and_never_negative():
-    q = order_quantity([0.1, 0.5, 0.9], np.array([[0.0, 1.2, 3.0], [-1.0, -0.5, 0.0]]), 0.5)
-    assert q.tolist() == [2.0, 0.0]
+def test_order_rounding_rules_and_never_negative():
+    v = np.array([[0.0, 1.2, 3.0], [-1.0, -0.5, 0.0], [0.0, 0.3, 1.0], [0.0, 2.5, 4.0]])
+    assert order_quantity([0.1, 0.5, 0.9], v, 0.5).tolist() == [1.0, 0.0, 0.0, 3.0]          # nearest (half up)
+    assert order_quantity([0.1, 0.5, 0.9], v, 0.5, rounding="up").tolist() == [2.0, 0.0, 1.0, 3.0]
+    with pytest.raises(ValueError):
+        to_units(np.array([1.0]), rounding="sideways")
 
 
 def test_newsvendor_costs_hand_example():

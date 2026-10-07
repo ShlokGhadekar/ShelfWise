@@ -19,6 +19,8 @@ reports/data_quality/*
 reports/benchmarks/*
 !reports/**/.gitkeep
 reports/run_timings.csv
+# archived copies of past runs (git add -f what you want to publish)
+reports/runs/
 
 logs/*
 !logs/.gitkeep
